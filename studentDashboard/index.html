@@ -1,0 +1,165 @@
+<!DOCTYPE html>
+<html lang="en" class="light">
+  <head>
+    <meta charset="UTF-8" />
+    <title>Student Dashboard</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+      tailwind.config = {
+        darkMode: 'class',
+      };
+    </script>
+  </head>
+  <body class="bg-white dark:bg-gray-900 text-black dark:text-white">
+    <div class="container mx-auto py-10 space-y-6">
+      <div class="flex justify-between items-center">
+        <h1 class="text-2xl font-semibold">Student Dashboard</h1>
+        <button id="themeToggle" class="px-4 py-2 bg-black text-white dark:bg-white dark:text-black rounded">
+          Toggle Theme
+        </button>
+      </div>
+
+      <form id="student-form" class="space-y-3">
+        <div class="flex flex-row gap-4 flex-wrap">
+            <input id="name" name="name" type="text" placeholder="Name" required class="w-full p-2 border rounded text-gray-800 block" />
+            <input id="age" name="age" type="number" placeholder="Age" required class="w-full p-2 border rounded text-gray-800 block" />
+            <input id="grades" name="grades" type="text" placeholder="Grades (comma-separated)" required class="w-full p-2 border block rounded text-gray-800   " />
+        </div>
+        <input type="hidden" id="editingId" name="editingId" />
+        <button id="submitBtn" type="submit" class="bg-blue-500 text-white px-4 py-2 rounded">Add Student</button>
+      </form>
+      <h4>Toggle password</h4>
+      <div class="relative max-w-fit">
+        <input
+          type="password"
+          id="teacher-password"
+          placeholder="Password"
+          class="px-3 py-2 rounded border border-gray-300 text-gray-500"
+        />
+        <button
+          type="button"
+          id="toggle-password"
+          class="absolute right-2 top-1/2 -translate-y-1/2 text-sm text-gray-800"
+        >
+          Show
+        </button>
+      </div>    
+
+      <div class="flex items-center gap-2">
+        <label for="filterPassed">Show Passed Only</label>
+        <input type="checkbox" id="filterPassed" />
+      </div>
+
+      <button id="fetch-grades-btn" class="bg-green-500 text-white px-4 py-2 rounded">Fetch Dummy Grade</button>
+
+      <table class="table-auto w-full mt-4 border-collapse">
+        <thead>
+          <tr class="bg-gray-200 dark:bg-gray-700">
+            <th class="border px-2 py-1">Name</th>
+            <th class="border px-2 py-1">Age</th>
+            <th class="border px-2 py-1">Grades</th>
+            <th class="border px-2 py-1">Average</th>
+            <th class="border px-2 py-1">Actions</th>
+          </tr>
+        </thead>
+        <tbody id="studentTableBody"></tbody>
+      </table>
+    </div>
+
+    <script type="module">
+      import { loadStudents, addStudent, updateStudent } from './student.js';
+      import { renderStudents, fillFormForEdit } from './dom.js';
+      import { fetchDummyGrades } from './api.js';
+      import { toggleTheme, loadTheme } from './theme.js';
+
+      window.addEventListener("DOMContentLoaded", () => {
+        loadTheme(); // ✅ Ensure correct theme is applied on load
+        loadStudents();
+        renderStudents();
+
+        document.getElementById("themeToggle").addEventListener("click", toggleTheme);
+
+        document.getElementById("filterPassed").addEventListener("change", e => {
+          renderStudents(e.target.checked);
+        });
+
+        document.getElementById("student-form").addEventListener("submit", e => {
+          e.preventDefault();
+          const formData = new FormData(e.target);
+          const data = Object.fromEntries(formData.entries());
+
+          try {
+            if (data.editingId) {
+              updateStudent(data.editingId, data);
+            } else {
+              addStudent(data);
+            }
+            e.target.reset();
+            document.getElementById("editingId").value = "";
+            document.getElementById("submitBtn").textContent = "Add Student";
+            renderStudents(document.getElementById("filterPassed").checked);
+          } catch (err) {
+            alert(err.message);
+          }
+        });
+
+        document.getElementById("fetch-grades-btn").addEventListener("click", async () => {
+          const students = JSON.parse(localStorage.getItem("students")) || [];
+          if (students.length === 0) return alert("No students available.");
+          const index = Math.floor(Math.random() * students.length);
+          const student = students[index];
+          const dummy = await fetchDummyGrades();
+          const gradesArr = student.grades.split(',').map(g => parseFloat(g.trim()));
+          gradesArr.push(dummy);
+          const avg = (gradesArr.reduce((a, b) => a + b, 0) / gradesArr.length).toFixed(2);
+          students[index] = { ...student, grades: gradesArr.join(','), average: avg };
+          localStorage.setItem("students", JSON.stringify(students));
+          renderStudents(document.getElementById("filterPassed").checked);
+        });
+
+        window.fillFormForEdit = fillFormForEdit;
+      });
+
+      import { setStudents } from './student.js';
+
+document.getElementById("fetch-grades-btn").addEventListener("click", async () => {
+  const currentStudents = JSON.parse(localStorage.getItem("students")) || [];
+  if (currentStudents.length === 0) return alert("No students available.");
+
+  const index = Math.floor(Math.random() * currentStudents.length);
+  const student = currentStudents[index];
+
+  const dummyGrade = await fetchDummyGrades();
+
+  const gradesArr = student.grades.split(',').map(g => parseFloat(g.trim()));
+  gradesArr.push(dummyGrade);
+
+  const avg = (gradesArr.reduce((a, b) => a + b, 0) / gradesArr.length).toFixed(2);
+
+  currentStudents[index] = {
+    ...student,
+    grades: gradesArr.join(','),
+    average: avg,
+  };
+
+  setStudents(currentStudents); // update internal array + localStorage
+  renderStudents(document.getElementById("filterPassed").checked); // rerender immediately
+});
+
+// Toggle password visibility
+const pwInput = document.getElementById('teacher-password');
+  const toggleBtn = document.getElementById('toggle-password');
+
+  toggleBtn.addEventListener('click', () => {
+    if (pwInput.type === 'password') {
+      pwInput.type = 'text';
+      toggleBtn.textContent = 'Hide';
+    } else {
+      pwInput.type = 'password';
+      toggleBtn.textContent = 'Show';
+    }
+  });
+
+    </script>
+  </body>
+</html>
